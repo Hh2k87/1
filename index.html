@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Account Dashboard ULTRA</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+margin:0;
+font-family:Arial;
+background-size:cover;
+background-position:center;
+transition:0.4s;
+}
+
+/* Sidebar */
+
+.sidebar{
+width:220px;
+height:100vh;
+position:fixed;
+left:0;
+top:0;
+padding:20px;
+
+background:rgba(255,255,255,0.15);
+backdrop-filter:blur(25px);
+
+box-shadow:5px 0 30px rgba(0,0,0,0.25);
+}
+
+.sidebar h2{
+margin-bottom:20px;
+}
+
+.sidebar button{
+width:100%;
+margin-bottom:10px;
+}
+
+/* Main */
+
+.main{
+margin-left:240px;
+padding:20px;
+}
+
+/* Liquid Glass Cards */
+
+.card{
+padding:20px;
+margin-bottom:20px;
+border-radius:18px;
+
+background:rgba(255,255,255,0.18);
+backdrop-filter:blur(25px);
+
+box-shadow:0 10px 40px rgba(0,0,0,0.3);
+
+transition:0.3s;
+}
+
+.card:hover{
+transform:translateY(-5px) scale(1.01);
+}
+
+/* Table */
+
+table{
+width:100%;
+border-collapse:collapse;
+}
+
+td,th{
+padding:8px;
+}
+
+/* Buttons */
+
+button{
+padding:6px 10px;
+border:none;
+border-radius:7px;
+cursor:pointer;
+transition:0.2s;
+}
+
+button:hover{
+transform:scale(1.05);
+}
+
+input,select{
+padding:6px;
+margin:4px;
+border-radius:6px;
+border:none;
+}
+
+/* Rank Colors */
+
+.rank-gold{color:#facc15;}
+.rank-platinum{color:#38bdf8;}
+.rank-diamond{color:#a78bfa;}
+.rank-master{color:#f43f5e;}
+
+/* Dark Mode */
+
+body.dark{
+background:#0f172a;
+color:white;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="sidebar">
+
+<h2>Dashboard</h2>
+
+<button onclick="toggleDark()">Dark / Light</button>
+
+<button onclick="exportTxt()">Export TXT</button>
+
+<input type="file" id="importTxt">
+
+<input type="file" id="bgUpload">
+
+<select id="filterStatus">
+<option value="">All Status</option>
+<option>ON</option>
+<option>SELL</option>
+</select>
+
+<select id="filterRank">
+<option value="">All Rank</option>
+<option>Vàng</option>
+<option>Bạch Kim</option>
+<option>Kim Cương</option>
+<option>Cao Thủ</option>
+</select>
+
+</div>
+
+<div class="main">
+
+<h2>Account Dashboard ULTRA</h2>
+
+<input id="search" placeholder="Search name or rank">
+
+<div class="card">
+
+<h3>Add Account</h3>
+
+<input id="name" placeholder="name">
+
+<input id="username" placeholder="username">
+
+<input id="password" placeholder="password">
+
+<select id="rank">
+<option>Vàng</option>
+<option>Bạch Kim</option>
+<option>Kim Cương</option>
+<option>Cao Thủ</option>
+</select>
+
+<select id="status">
+<option>ON</option>
+<option>SELL</option>
+</select>
+
+<button onclick="addAccount()">Add</button>
+
+</div>
+
+<div class="card">
+
+Total: <span id="total"></span>
+
+| 🟢 ON: <span id="onCount"></span>
+
+| 🔴 SELL: <span id="sellCount"></span>
+
+</div>
+
+<div class="card">
+
+<canvas id="chart"></canvas>
+
+</div>
+
+<div class="card">
+
+<table id="table">
+
+<thead>
+
+<tr>
+<th>UID</th>
+<th>Name</th>
+<th>User</th>
+<th>Pass</th>
+<th>Rank</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+
+</thead>
+
+<tbody></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+<script>
+
+let accounts=JSON.parse(localStorage.getItem("accounts")||"[]")
+
+const tbody=document.querySelector("#table tbody")
+
+const searchInput=document.getElementById("search")
+
+const filterStatus=document.getElementById("filterStatus")
+
+const filterRank=document.getElementById("filterRank")
+
+const rankOrder={
+"Vàng":1,
+"Bạch Kim":2,
+"Kim Cương":3,
+"Cao Thủ":4
+}
+
+function save(){
+
+localStorage.setItem("accounts",JSON.stringify(accounts))
+
+}
+
+function getRankClass(rank){
+
+if(rank==="Vàng") return "rank-gold"
+if(rank==="Bạch Kim") return "rank-platinum"
+if(rank==="Kim Cương") return "rank-diamond"
+if(rank==="Cao Thủ") return "rank-master"
+
+return ""
+
+}
+
+function render(){
+
+tbody.innerHTML=""
+
+let search=searchInput.value.toLowerCase()
+
+let filtered=accounts.filter(a=>{
+
+return(
+(a.name.toLowerCase().includes(search) ||
+a.rank.toLowerCase().includes(search)) &&
+
+(filterStatus.value=="" || a.status===filterStatus.value) &&
+
+(filterRank.value=="" || a.rank===filterRank.value)
+
+)
+
+})
+
+filtered.sort((a,b)=>{
+
+let ra=rankOrder[a.rank]||99
+let rb=rankOrder[b.rank]||99
+
+return rb-ra
+
+})
+
+let on=0
+let sell=0
+
+filtered.forEach(acc=>{
+
+if(acc.status==="ON") on++
+if(acc.status==="SELL") sell++
+
+let tr=document.createElement("tr")
+
+tr.innerHTML=`
+
+<td>${acc.id}</td>
+<td>${acc.name}</td>
+<td id="u${acc.id}">${acc.username}</td>
+<td id="p${acc.id}">${acc.password}</td>
+
+<td class="${getRankClass(acc.rank)}">${acc.rank}</td>
+
+<td>${acc.status}</td>
+
+<td>
+
+<button onclick="copyText('u${acc.id}')">User</button>
+
+<button onclick="copyText('p${acc.id}')">Pass</button>
+
+<button onclick="copyFull(${acc.id})">Full</button>
+
+<button onclick="toggleStatus(${acc.id})">Toggle</button>
+
+<button onclick="removeAcc(${acc.id})">Delete</button>
+
+</td>
+
+`
+
+tbody.appendChild(tr)
+
+})
+
+document.getElementById("total").innerText=filtered.length
+document.getElementById("onCount").innerText=on
+document.getElementById("sellCount").innerText=sell
+
+updateChart()
+
+}
+
+function addAccount(){
+
+let name=document.getElementById("name").value
+let username=document.getElementById("username").value
+let password=document.getElementById("password").value
+let rank=document.getElementById("rank").value
+let status=document.getElementById("status").value
+
+accounts.push({
+
+id:Date.now(),
+name,
+username,
+password,
+rank,
+status
+
+})
+
+save()
+
+render()
+
+}
+
+function removeAcc(id){
+
+accounts=accounts.filter(a=>a.id!=id)
+
+save()
+
+render()
+
+}
+
+function toggleStatus(id){
+
+accounts.forEach(a=>{
+
+if(a.id==id){
+
+a.status=a.status==="ON"?"SELL":"ON"
+
+}
+
+})
+
+save()
+
+render()
+
+}
+
+function copyText(id){
+
+let text=document.getElementById(id).innerText
+
+navigator.clipboard.writeText(text)
+
+alert("Copied: "+text)
+
+}
+
+function copyFull(id){
+
+let a=accounts.find(x=>x.id==id)
+
+let text=`${a.id}|${a.username}|${a.password}|${a.rank}`
+
+navigator.clipboard.writeText(text)
+
+alert(text)
+
+}
+
+searchInput.addEventListener("input",render)
+
+filterStatus.addEventListener("change",render)
+
+filterRank.addEventListener("change",render)
+
+function toggleDark(){
+
+document.body.classList.toggle("dark")
+
+}
+
+document.getElementById("bgUpload").onchange=function(e){
+
+let reader=new FileReader()
+
+reader.onload=function(){
+
+document.body.style.backgroundImage="url("+reader.result+")"
+
+localStorage.setItem("bg",reader.result)
+
+}
+
+reader.readAsDataURL(e.target.files[0])
+
+}
+
+let bg=localStorage.getItem("bg")
+
+if(bg){
+
+document.body.style.backgroundImage="url("+bg+")"
+
+}
+
+function exportTxt(){
+
+let lines=accounts.map(a=>
+
+`${a.id}|${a.username}|${a.password}|${a.rank}`
+
+)
+
+let blob=new Blob([lines.join("\n")])
+
+let a=document.createElement("a")
+
+a.href=URL.createObjectURL(blob)
+
+a.download="accounts.txt"
+
+a.click()
+
+}
+
+document.getElementById("importTxt").onchange=function(e){
+
+let file=e.target.files[0]
+
+let reader=new FileReader()
+
+reader.onload=function(){
+
+let lines=reader.result.split("\n")
+
+lines.forEach(line=>{
+
+let p=line.split("|")
+
+if(p.length>=4){
+
+accounts.push({
+
+id:Number(p[0])||Date.now(),
+name:"import",
+username:p[1],
+password:p[2],
+rank:p[3],
+status:"ON"
+
+})
+
+}
+
+})
+
+save()
+
+render()
+
+}
+
+reader.readAsText(file)
+
+}
+
+let chart
+
+function updateChart(){
+
+let ranks={}
+
+accounts.forEach(a=>{
+
+ranks[a.rank]=(ranks[a.rank]||0)+1
+
+})
+
+let labels=Object.keys(ranks)
+
+let data=Object.values(ranks)
+
+if(chart) chart.destroy()
+
+chart=new Chart(
+
+document.getElementById("chart"),
+
+{
+
+type:"pie",
+
+data:{
+
+labels:labels,
+datasets:[{data:data}]
+
+}
+
+}
+
+)
+
+}
+
+render()
+
+</script>
+
+</body>
+</html>
